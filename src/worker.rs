@@ -4,11 +4,11 @@ use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::sync::{mpsc, watch};
+use tokio::time::{Duration, sleep};
 use tokio_tungstenite::{
-    tungstenite::protocol::{Message as TungsteniteMessage, Role},
     WebSocketStream,
+    tungstenite::protocol::{Message as TungsteniteMessage, Role},
 };
 use url::Url;
 
@@ -17,22 +17,37 @@ const HISTORY_MAX_LENGTH: usize = 500;
 /// the main background loop for a server
 /// it attempts to connect, and if it fails or disconnects, it waits 5 seconds and retries
 pub async fn run_worker(
-    config: ServerConfig,
     state: Arc<ServerState>,
     mut cmd_rx: mpsc::Receiver<String>,
+    mut config_rx: watch::Receiver<ServerConfig>,
 ) {
     loop {
+        let config = config_rx.borrow().clone();
         println!("Worker [{}]: Attempting connection...", config.id);
 
-        // pass cmd_rx as a mutable reference so it survives reconnects
-        if let Err(e) = connect_and_handle(&config, &state, &mut cmd_rx).await {
-            eprintln!(
-                "Worker [{}]: Connection error: {}. Retrying in 5s...",
-                config.id, e
-            );
-        }
+        tokio::select! {
+            res = connect_and_handle(&config, &state, &mut cmd_rx) => {
+                if let Err(e) = res {
+                    eprintln!("Worker [{}]: Connection error: {}. Retrying in 5s...", config.id, e);
+                }
 
-        sleep(Duration::from_secs(5)).await;
+                // sleep, but wake up immediately if config changes or is deleted
+                tokio::select! {
+                    _ = sleep(Duration::from_secs(5)) => {}
+                    res = config_rx.changed() => {
+                        if res.is_err() { break; } // channel dropped, exit worker
+                    }
+                }
+            }
+            res = config_rx.changed() => {
+                if res.is_err() {
+                    println!("Worker [{}]: Config removed, shutting down worker.", config.id);
+                    break;
+                } else {
+                    println!("Worker [{}]: Config updated! Reconnecting...", config.id);
+                }
+            }
+        }
     }
 }
 
@@ -41,7 +56,7 @@ async fn connect_and_handle(
     config: &ServerConfig,
     state: &Arc<ServerState>,
     cmd_rx: &mut mpsc::Receiver<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let parsed_url = Url::parse(&config.url)?;
     let host = parsed_url.host_str().unwrap_or("localhost");
     let port = parsed_url.port_or_known_default().unwrap_or(80);
@@ -120,10 +135,10 @@ async fn connect_and_handle(
                 if let Some(cmd_payload) = cmd {
                     // expected format: {"type":"stdin","data":"list\n"}
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cmd_payload) {
-                        
+
                         // Extract the raw command string for the UI
                         if let Some(raw_command) = json.get("data").and_then(|v| v.as_str()) {
-                            
+
                             let display_text = format!("> {}", raw_command);
 
                             let mut history = state.history.write().await;

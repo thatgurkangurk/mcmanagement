@@ -3,8 +3,8 @@ use crate::state::AppState;
 use askama::Template;
 use axum::{
     extract::{
-        ws::{Message as AxumMessage, WebSocket, WebSocketUpgrade},
         Path, State,
+        ws::{Message as AxumMessage, WebSocket, WebSocketUpgrade},
     },
     http::StatusCode,
     response::{Html, IntoResponse},
@@ -34,8 +34,18 @@ pub async fn serve_index(State(state): State<Arc<AppState>>) -> impl IntoRespons
     }
 }
 
-pub async fn serve_console(Path(id): Path<String>, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let server = state.config.read().unwrap().servers.iter().find(|s| s.id == id).cloned();
+pub async fn serve_console(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let server = state
+        .config
+        .read()
+        .unwrap()
+        .servers
+        .iter()
+        .find(|s| s.id == id)
+        .cloned();
     match server {
         Some(s) => match (ConsoleTemplate { server: s }).render() {
             Ok(html) => Html(html).into_response(),
@@ -45,7 +55,11 @@ pub async fn serve_console(Path(id): Path<String>, State(state): State<Arc<AppSt
     }
 }
 
-pub async fn ws_handler(Path(id): Path<String>, ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn ws_handler(
+    Path(id): Path<String>,
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_client(socket, state, id))
 }
 
@@ -61,7 +75,11 @@ async fn handle_client(mut browser_ws: WebSocket, state: Arc<AppState>, server_i
     {
         let history = server_state.history.read().await;
         for line in history.iter() {
-            if browser_ws.send(AxumMessage::Text(line.clone().into())).await.is_err() {
+            if browser_ws
+                .send(AxumMessage::Text(line.clone().into()))
+                .await
+                .is_err()
+            {
                 return;
             }
         }
@@ -74,7 +92,13 @@ async fn handle_client(mut browser_ws: WebSocket, state: Arc<AppState>, server_i
 
     let mut rx_task = tokio::spawn(async move {
         while let Ok(msg) = log_rx.recv().await {
-            if browser_sender.send(AxumMessage::Text(msg.into())).await.is_err() { break; }
+            if browser_sender
+                .send(AxumMessage::Text(msg.into()))
+                .await
+                .is_err()
+            {
+                break;
+            }
         }
     });
 
