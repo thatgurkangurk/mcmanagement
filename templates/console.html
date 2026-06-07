@@ -33,6 +33,8 @@
         const cmdInput = document.getElementById('cmd');
         const statusEl = document.getElementById('status');
         const retryBtn = document.getElementById('retry-btn');
+
+        
         let ws;
 
         function connect() {
@@ -42,7 +44,8 @@
             retryBtn.style.display = 'none';
             cmdInput.disabled = true;
 
-            ws = new WebSocket("ws://" + location.host + "/ws/{{ server.id }}");
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${location.host}/ws/{{ server.id }}`);
 
             ws.onopen = () => {
                 statusEl.textContent = '🟢 Online';
