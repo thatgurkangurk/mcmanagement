@@ -1,0 +1,20 @@
+# Rust specific files
+target/
+**/*.rs.bk
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE/Editor files
+.vscode/
+.idea/
+.DS_Store
+
+# Misc
+node_modules/
+*.log

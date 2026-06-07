@@ -1,0 +1,14 @@
+[package]
+name = "mcmanagement"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+askama = "0.16.0"
+axum = { version = "0.8.9", features = ["ws"] }
+futures-util = "0.3.32"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+tokio = { version = "1.52.3", features = ["full"] }
+tokio-tungstenite = "0.29.0"
+url = "2.5.8"
