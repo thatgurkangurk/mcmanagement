@@ -15,7 +15,10 @@ docker compose usage example:
 ```yaml
 services:
   mcmanagement:
-    image: ghcr.io/thatgurkangurk/mcmanagement:latest # or pin a specific version. want the latest commit? use `we-test-in-production` (not recommended, might be unstable !)
+    image: ghcr.io/thatgurkangurk/mcmanagement:latest 
+    # or pin a specific version
+    # want the latest commit? use `we-test-in-production`
+    # (not recommended, might be unstable !)
     ports:
       - 8080:8080
     volumes:
