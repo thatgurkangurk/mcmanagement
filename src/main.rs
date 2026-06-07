@@ -38,11 +38,10 @@ async fn main() {
 
     let (notify_tx, mut notify_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut watcher = notify::recommended_watcher(move |res: NotifyResult<notify::Event>| {
-        if let Ok(event) = res {
-            if event.kind.is_modify() {
+        if let Ok(event) = res
+            && event.kind.is_modify() {
                 let _ = notify_tx.send(()); // signal the manager task
             }
-        }
     })
     .unwrap();
     watcher
@@ -53,10 +52,10 @@ async fn main() {
     tokio::spawn(async move {
         while let Some(_) = notify_rx.recv().await {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            while let Ok(_) = notify_rx.try_recv() {}
+            while notify_rx.try_recv().is_ok() {}
 
-            if let Ok(new_data) = fs::read_to_string(config_path) {
-                if let Ok(new_cfg) = serde_json::from_str::<Config>(&new_data) {
+            if let Ok(new_data) = fs::read_to_string(config_path)
+                && let Ok(new_cfg) = serde_json::from_str::<Config>(&new_data) {
                     println!("Detected config change! Synchronizing workers...");
 
                     {
@@ -92,7 +91,6 @@ async fn main() {
                         keep
                     });
                 }
-            }
         }
     });
 
