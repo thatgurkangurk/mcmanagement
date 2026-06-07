@@ -68,18 +68,16 @@ async fn main() {
     // 3. Setup File Watcher
     let watcher_state = state.clone();
     let mut watcher = notify::recommended_watcher(move |res: NotifyResult<notify::Event>| {
-        if let Ok(event) = res {
-            if event.kind.is_modify() {
+        if let Ok(event) = res
+            && event.kind.is_modify() {
                 // Reload the file
-                if let Ok(new_data) = fs::read_to_string(config_path) {
-                    if let Ok(new_cfg) = serde_json::from_str::<Config>(&new_data) {
+                if let Ok(new_data) = fs::read_to_string(config_path)
+                    && let Ok(new_cfg) = serde_json::from_str::<Config>(&new_data) {
                         let mut cfg = watcher_state.config.write().unwrap();
                         *cfg = new_cfg;
                         println!("Configuration reloaded!");
                     }
-                }
             }
-        }
     })
     .unwrap();
 
@@ -223,14 +221,11 @@ async fn handle_socket(browser_ws: WebSocket, state: Arc<AppState>, server_id: S
 
     let mut mc_to_browser = tokio::spawn(async move {
         while let Some(Ok(msg)) = mc_receiver.next().await {
-            match msg {
-                TungsteniteMessage::Text(text) => {
-                    let axum_text = AxumMessage::Text(text.to_string().into());
-                    if browser_sender.send(axum_text).await.is_err() {
-                        break;
-                    }
+            if let TungsteniteMessage::Text(text) = msg {
+                let axum_text = AxumMessage::Text(text.to_string().into());
+                if browser_sender.send(axum_text).await.is_err() {
+                    break;
                 }
-                _ => {}
             }
         }
     });
