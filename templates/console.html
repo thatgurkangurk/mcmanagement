@@ -1,102 +1,158 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
+  <head>
     <title>{{ server.name }} - Console</title>
     <style>
-        body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .controls { display: flex; align-items: center; gap: 15px; }
-        .back-btn, .retry-btn { color: #fff; text-decoration: none; background: #444; padding: 6px 15px; border-radius: 5px; border: none; cursor: pointer; font-size: 14px; }
-        .retry-btn { background: #d9534f; display: none; } /* Hidden by default */
-        .retry-btn:hover { background: #c9302c; }
-        #status { font-weight: bold; }
-        #log { height: 600px; overflow-y: auto; background: #000; color: #0f0; padding: 10px; font-family: monospace; white-space: pre-wrap; border-radius: 5px; margin: 0; }
-        #cmd { width: 100%; padding: 10px; box-sizing: border-box; background: #111; color: #0f0; border: 1px solid #444; margin-top: 10px; }
-        #cmd:disabled { background: #333; cursor: not-allowed; }
+      body {
+        background: #222;
+        color: #fff;
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+      .back-btn,
+      .retry-btn {
+        color: #fff;
+        text-decoration: none;
+        background: #444;
+        padding: 6px 15px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .retry-btn {
+        background: #d9534f;
+        display: none;
+      } /* Hidden by default */
+      .retry-btn:hover {
+        background: #c9302c;
+      }
+      #status {
+        font-weight: bold;
+      }
+      #log {
+        height: 600px;
+        overflow-y: auto;
+        background: #000;
+        color: #0f0;
+        padding: 10px;
+        font-family: monospace;
+        white-space: pre-wrap;
+        border-radius: 5px;
+        margin: 0;
+      }
+      #cmd {
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+        background: #111;
+        color: #0f0;
+        border: 1px solid #444;
+        margin-top: 10px;
+      }
+      #cmd:disabled {
+        background: #333;
+        cursor: not-allowed;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="header">
-        <h2>{{ server.name }} Console</h2>
-        <div class="controls">
-            <span id="status">🟡 Connecting...</span>
-            <button id="retry-btn" class="retry-btn" onclick="connect()">↻ Retry</button>
-            <a href="/" class="back-btn">&larr; Back</a>
-        </div>
+      <h2>{{ server.name }} Console</h2>
+      <div class="controls">
+        <span id="status">🟡 Connecting...</span>
+        <button id="retry-btn" class="retry-btn" onclick="connect()">
+          ↻ Retry
+        </button>
+        <a href="/" class="back-btn">&larr; Back</a>
+      </div>
     </div>
-    
+
     <pre id="log"></pre>
-    <input type="text" id="cmd" placeholder="Enter server command..." disabled>
-    
+    <input
+      type="text"
+      id="cmd"
+      placeholder="Enter server command..."
+      disabled
+    />
+
     <script>
-        const log = document.getElementById('log');
-        const cmdInput = document.getElementById('cmd');
-        const statusEl = document.getElementById('status');
-        const retryBtn = document.getElementById('retry-btn');
+      const log = document.getElementById("log");
+      const cmdInput = document.getElementById("cmd");
+      const statusEl = document.getElementById("status");
+      const retryBtn = document.getElementById("retry-btn");
 
-        
-        let ws;
+      let ws;
 
-        function connect() {
-            // 1. Reset UI state for connecting
-            statusEl.textContent = '🟡 Connecting...';
-            statusEl.style.color = '#ffcc00';
-            retryBtn.style.display = 'none';
-            cmdInput.disabled = true;
+      function connect() {
+        // 1. Reset UI state for connecting
+        statusEl.textContent = "🟡 Connecting...";
+        statusEl.style.color = "#ffcc00";
+        retryBtn.style.display = "none";
+        cmdInput.disabled = true;
 
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${location.host}/ws/{{ server.id }}`);
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${protocol}//${location.host}/ws/{{ server.id }}`);
 
-            ws.onopen = () => {
-                statusEl.textContent = '🟢 Online';
-                statusEl.style.color = '#5cb85c';
-                cmdInput.disabled = false;
-                cmdInput.focus();
-                log.textContent += "\n[System] Connected to server.\n";
-                log.scrollTop = log.scrollHeight;
-            };
-
-            ws.onclose = () => {
-                statusEl.textContent = '🔴 Offline';
-                statusEl.style.color = '#d9534f';
-                retryBtn.style.display = 'inline-block';
-                cmdInput.disabled = true;
-                log.textContent += "\n[System] Connection lost.\n";
-                log.scrollTop = log.scrollHeight;
-            };
-
-            ws.onmessage = (e) => {
-                try {
-                    const payload = JSON.parse(e.data);
-                    if (payload.type === 'logHistory') {
-                        log.textContent += payload.lines.join('');
-                    } else if (payload.type === 'stdout' || payload.type === 'stderr') {
-                        log.textContent += payload.data; 
-                    } else if (payload.type === 'authFailure') {
-                        log.textContent += "\n[AUTH FAILURE]: " + payload.reason + "\n";
-                    }
-                } catch (err) {
-                    log.textContent += e.data + '\n';
-                }
-                log.scrollTop = log.scrollHeight;
-            };
-        }
-
-        cmdInput.onkeydown = (e) => {
-            if (e.key === 'Enter' && e.target.value.trim() !== '') {
-                const command = e.target.value;
-                log.textContent += "> " + command + "\n";
-                log.scrollTop = log.scrollHeight;
-                
-                // Ensure WS is actually open before sending
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "stdin", data: command + "\n" }));
-                }
-                e.target.value = '';
-            }
+        ws.onopen = () => {
+          statusEl.textContent = "🟢 Online";
+          statusEl.style.color = "#5cb85c";
+          cmdInput.disabled = false;
+          cmdInput.focus();
+          log.textContent += "\n[System] Connected to server.\n";
+          log.scrollTop = log.scrollHeight;
         };
 
-        connect();
+        ws.onclose = () => {
+          statusEl.textContent = "🔴 Offline";
+          statusEl.style.color = "#d9534f";
+          retryBtn.style.display = "inline-block";
+          cmdInput.disabled = true;
+          log.textContent += "\n[System] Connection lost.\n";
+          log.scrollTop = log.scrollHeight;
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload.type === "logHistory") {
+              log.textContent += payload.lines.join("");
+            } else if (payload.type === "stdout" || payload.type === "stderr") {
+              log.textContent += payload.data;
+            } else if (payload.type === "authFailure") {
+              log.textContent += "\n[AUTH FAILURE]: " + payload.reason + "\n";
+            }
+          } catch (err) {
+            log.textContent += e.data + "\n";
+          }
+          log.scrollTop = log.scrollHeight;
+        };
+      }
+
+      cmdInput.onkeydown = (e) => {
+        if (e.key === "Enter" && e.target.value.trim() !== "") {
+          const command = e.target.value;
+
+          // Ensure WS is actually open before sending
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "stdin", data: command }));
+          }
+          e.target.value = "";
+        }
+      };
+
+      connect();
     </script>
-</body>
+  </body>
 </html>
