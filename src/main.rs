@@ -10,8 +10,12 @@ use axum::{
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
+use notify::{RecursiveMode, Result as NotifyResult, Watcher};
 use serde::Deserialize;
-use std::{fs, sync::Arc};
+use std::{
+    fs,
+    sync::{Arc, RwLock},
+};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{
@@ -34,7 +38,7 @@ struct Config {
 }
 
 struct AppState {
-    config: Config,
+    config: RwLock<Config>,
 }
 
 // --- Askama Templates ---
@@ -56,9 +60,32 @@ async fn main() {
         .map(|_| "/app/servers.json")
         .unwrap_or("servers.json");
 
-    let config_data = fs::read_to_string(config_path).expect(&format!("Failed to read config file at: {}", config_path));
-    let config: Config = serde_json::from_str(&config_data).expect("Failed to parse JSON");
-    let state = Arc::new(AppState { config });
+    let config: Config = serde_json::from_str(&fs::read_to_string(config_path).unwrap()).unwrap();
+    let state = Arc::new(AppState {
+        config: RwLock::new(config),
+    });
+
+    // 3. Setup File Watcher
+    let watcher_state = state.clone();
+    let mut watcher = notify::recommended_watcher(move |res: NotifyResult<notify::Event>| {
+        if let Ok(event) = res {
+            if event.kind.is_modify() {
+                // Reload the file
+                if let Ok(new_data) = fs::read_to_string(config_path) {
+                    if let Ok(new_cfg) = serde_json::from_str::<Config>(&new_data) {
+                        let mut cfg = watcher_state.config.write().unwrap();
+                        *cfg = new_cfg;
+                        println!("Configuration reloaded!");
+                    }
+                }
+            }
+        }
+    })
+    .unwrap();
+
+    watcher
+        .watch(config_path.as_ref(), RecursiveMode::NonRecursive)
+        .unwrap();
 
     let app = Router::new()
         .route("/", get(serve_index))
@@ -73,7 +100,7 @@ async fn main() {
 
 async fn serve_index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let template = IndexTemplate {
-        servers: state.config.servers.clone(),
+        servers: state.config.read().unwrap().servers.clone(),
     };
 
     match template.render() {
@@ -89,7 +116,14 @@ async fn serve_console(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let server = state.config.servers.iter().find(|s| s.id == id).cloned();
+    let server = state
+        .config
+        .read()
+        .unwrap()
+        .servers
+        .iter()
+        .find(|s| s.id == id)
+        .cloned();
 
     match server {
         Some(s) => {
@@ -115,11 +149,14 @@ async fn ws_handler(
 }
 
 async fn handle_socket(browser_ws: WebSocket, state: Arc<AppState>, server_id: String) {
-    let server_config = match state.config.servers.iter().find(|s| s.id == server_id) {
-        Some(config) => config,
-        None => {
-            eprintln!("WebSocket requested for unknown server ID: {}", server_id);
-            return;
+    let server_config = {
+        let config = state.config.read().unwrap();
+        match config.servers.iter().find(|s| s.id == server_id).cloned() {
+            Some(c) => c,
+            None => {
+                eprintln!("WebSocket requested for unknown server ID: {}", server_id);
+                return;
+            }
         }
     };
 
