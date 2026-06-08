@@ -1,15 +1,18 @@
-[package]
-name = "mcmanagement"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+    "packages/ui",
+    "packages/web",
+    "packages/api",
+    "packages/shared",
+    "packages/server",
+]
 
-[dependencies]
-askama = "0.16.0"
-axum = { version = "0.8.9", features = ["ws"] }
-futures-util = "0.3.32"
-notify = "8.2.0"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-tokio = { version = "1.52.3", features = ["full"] }
-tokio-tungstenite = "0.29.0"
-url = "2.5.8"
+[workspace.dependencies]
+dioxus = { version = "0.7.1" }
+
+# workspace
+ui = { path = "packages/ui" }
+api = { path = "packages/api" }
+shared = { path = "packages/shared" }
+server = { path = "packages/server" }

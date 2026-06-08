@@ -1,35 +1,64 @@
-FROM alpine:3.19 AS builder
-WORKDIR /app
+FROM docker.io/library/debian:trixie-slim AS base
 
-RUN apk add --no-cache curl bash build-base musl-dev && \
-    curl -fsSL https://mise.run | sh
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    git \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
+RUN curl https://mise.jdx.dev/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
-COPY mise.toml .
-RUN mise trust . && mise install
+WORKDIR /app
 
-COPY Cargo.toml Cargo.lock* ./
+COPY mise.toml ./
+COPY mise.lock ./
 
-ENV RUNNING_IN_DOCKER=true
+RUN mise trust
 
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    mise exec -- cargo build --release
+ENV MISE_YES=1
+RUN mise install
 
-RUN rm -rf src
+ENV PATH="/root/.local/share/mise/shims:$PATH"
 
-COPY src ./src
-COPY templates ./templates
+RUN cargo install cargo-chef
 
-RUN touch src/main.rs && \
-    mise exec -- cargo build --release
+FROM base AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-FROM alpine:latest
-WORKDIR /root/
+FROM base AS builder
+COPY --from=planner /app/recipe.json recipe.json
 
-COPY --from=builder /app/target/release/mcmanagement .
-RUN mkdir /app
+RUN cargo chef cook --release --recipe-path recipe.json
 
+ENV PATH="/.cargo/bin:$PATH"
+
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN cargo binstall dioxus-cli --root /.cargo -y --force
+
+
+ENV RUNNING_IN_DOCKER="true"
+
+COPY . .
+RUN dx bundle --package web --release
+
+FROM docker.io/library/debian:bookworm-slim AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/dx/web/release/web/ /usr/local/app
+
+ENV PORT=8080
+ENV IP=0.0.0.0
 EXPOSE 8080
-CMD ["./mcmanagement"]
+
+WORKDIR /usr/local/app
+
+ENTRYPOINT [ "/usr/local/app/server" ]

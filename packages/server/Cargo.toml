@@ -1,0 +1,18 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# We pull in dioxus with fullstack features since this handles the wrapper orchestration
+dioxus = { workspace = true, features = ["router", "fullstack"] }
+shared = { workspace = true  }
+
+axum = { version = "0.8.9", features = ["ws"] }
+notify = { version = "8.2.0" }
+tokio = { version = "1.52.3", features = ["full"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+futures-util = "0.3.32"
+tokio-tungstenite = "0.29.0"
+url = "2.5.8"

@@ -1,0 +1,3 @@
+currently, this is a copilot-assisted port to dioxus, and it may not be very stable (which is why the README labels it as experimental)
+
+do not push this as a pinned release (keep it on we-test-in-production) for now (until stability is more ensured)

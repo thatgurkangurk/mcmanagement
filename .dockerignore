@@ -1,6 +1,8 @@
 # Rust specific files
 target/
 **/*.rs.bk
+**/target
+**/dist
 
 # Git
 .git
