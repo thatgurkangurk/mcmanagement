@@ -1,12 +1,12 @@
 use dioxus::prelude::*;
 
-use views::{Home, Console};
+use views::{Console, Home};
 
 mod views;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
-enum Route {
+pub enum Route {
     #[layout(WebNavbar)]
     #[route("/")]
     Home {},

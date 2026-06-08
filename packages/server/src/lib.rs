@@ -1,7 +1,7 @@
 pub mod config;
 pub mod state;
-pub mod worker;
 pub mod web_backend;
+pub mod worker;
 
 use axum::Router;
 use config::Config;
@@ -95,8 +95,8 @@ pub async fn bootstrap_server_engine(
     });
 
     let finalised_router = router
-    .route("/ws/{id}", axum::routing::get(web_backend::ws_handler))
-    .layer(axum::Extension(state));
+        .route("/ws/{id}", axum::routing::get(web_backend::ws_handler))
+        .layer(axum::Extension(state));
 
     Ok(finalised_router)
 }

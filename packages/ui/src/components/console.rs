@@ -20,14 +20,14 @@ pub fn Console(id: String) -> Element {
 
     use_effect(move || {
         let _ = log_lines.read();
-        
+
         #[cfg(target_arch = "wasm32")]
         {
             let _ = document::eval(
                 "setTimeout(() => {
                     let el = document.getElementById('console-log-window');
                     if (el) el.scrollTop = el.scrollHeight;
-                }, 0);"
+                }, 0);",
             );
         }
     });
@@ -36,18 +36,22 @@ pub fn Console(id: String) -> Element {
     let ws_task = use_coroutine(move |mut rx: UnboundedReceiver<String>| {
         #[cfg(target_arch = "wasm32")]
         let value = target_id.clone();
-        
+
         async move {
             #[cfg(target_arch = "wasm32")]
             {
                 use futures_util::{SinkExt, StreamExt};
-                use gloo_net::websocket::{futures::WebSocket, Message};
+                use gloo_net::websocket::{Message, futures::WebSocket};
                 use serde_json::json;
 
                 let window = web_sys::window().unwrap();
                 let location = window.location();
                 let host = location.host().unwrap();
-                let protocol = if location.protocol().unwrap() == "https:" { "wss:" } else { "ws:" };
+                let protocol = if location.protocol().unwrap() == "https:" {
+                    "wss:"
+                } else {
+                    "ws:"
+                };
                 let ws_url = format!("{}//{}/ws/{}", protocol, host, value);
 
                 let mut push_log = |text: &str| {
@@ -64,7 +68,7 @@ pub fn Console(id: String) -> Element {
                     Ok(ws) => {
                         is_connected.set(true);
                         push_log("[System] connected to server.");
-                        
+
                         let (mut write, mut read) = ws.split();
 
                         let send_task = dioxus::prelude::spawn(async move {
@@ -79,11 +83,14 @@ pub fn Console(id: String) -> Element {
 
                         while let Some(Ok(Message::Text(txt))) = read.next().await {
                             if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&txt) {
-                                let msg_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                                
+                                let msg_type =
+                                    payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
                                 match msg_type {
                                     "logHistory" => {
-                                        if let Some(lines) = payload.get("lines").and_then(|v| v.as_array()) {
+                                        if let Some(lines) =
+                                            payload.get("lines").and_then(|v| v.as_array())
+                                        {
                                             for line_val in lines {
                                                 if let Some(line_str) = line_val.as_str() {
                                                     push_log(line_str);
@@ -92,16 +99,20 @@ pub fn Console(id: String) -> Element {
                                         }
                                     }
                                     "stdout" | "stderr" => {
-                                        if let Some(data) = payload.get("data").and_then(|v| v.as_str()) {
+                                        if let Some(data) =
+                                            payload.get("data").and_then(|v| v.as_str())
+                                        {
                                             push_log(data);
                                         }
                                     }
                                     "authFailure" => {
-                                        if let Some(reason) = payload.get("reason").and_then(|v| v.as_str()) {
+                                        if let Some(reason) =
+                                            payload.get("reason").and_then(|v| v.as_str())
+                                        {
                                             push_log(&format!("[AUTH FAILURE]: {}", reason));
                                         }
                                     }
-                                    _ => {} 
+                                    _ => {}
                                 }
                             } else {
                                 push_log(&txt);

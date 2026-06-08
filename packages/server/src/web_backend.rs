@@ -1,6 +1,9 @@
 use crate::state::AppState;
 use axum::{
-    extract::{ws::{Message, WebSocket, WebSocketUpgrade}, Path, Extension},
+    extract::{
+        Extension, Path,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     response::IntoResponse,
 };
 use futures_util::{SinkExt, StreamExt};
@@ -30,16 +33,16 @@ pub async fn ws_handler(
 async fn handle_socket(socket: WebSocket, id: String, state: Arc<AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
 
-let (s_state, log_tx, cmd_tx) = {
+    let (s_state, log_tx, cmd_tx) = {
         let servers = state.servers.read().unwrap();
         let s_state = match servers.get(&id) {
-            Some(srv) => Arc::clone(srv), 
+            Some(srv) => Arc::clone(srv),
             None => return,
         };
-        
+
         let log = s_state.log_tx.clone();
         let cmd = s_state.cmd_tx.clone();
-        
+
         (s_state, log, cmd)
     };
 
@@ -47,13 +50,12 @@ let (s_state, log_tx, cmd_tx) = {
 
     while let Some(line) = initial_history.pop_front() {
         if ws_tx.send(Message::Text(line.into())).await.is_err() {
-            return; 
+            return;
         }
     }
 
     let mut log_rx = log_tx.subscribe();
 
-    
     // pipe new incoming logs from the worker out to the frontend terminal
     let mut log_forward_task = tokio::spawn(async move {
         while let Ok(line) = log_rx.recv().await {
@@ -79,5 +81,8 @@ let (s_state, log_tx, cmd_tx) = {
         _ = &mut command_recv_task => log_forward_task.abort(),
     }
 
-    println!("WebSocket terminal connection closed for worker target [{}]", id);
+    println!(
+        "WebSocket terminal connection closed for worker target [{}]",
+        id
+    );
 }

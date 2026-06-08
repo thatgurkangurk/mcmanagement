@@ -1,11 +1,9 @@
-use dioxus::prelude::*;
+use dioxus::{prelude::*};
 use shared::ServerInfo;
 
 #[component]
 pub fn ServerList() -> Element {
-    let servers_resource = use_resource(move || async move {
-        api::get_servers().await
-    });
+    let servers_resource = use_resource(move || async move { api::get_servers().await });
 
     rsx! {
         div { class: "max-w-4xl mx-auto p-6",
@@ -46,7 +44,6 @@ pub fn ServerList() -> Element {
 
 #[component]
 fn ServerCard(server: ServerInfo) -> Element {
-
     rsx! {
         div { class: "p-5 rounded-xl bg-neutral-800 border border-neutral-700 hover:border-emerald-500 transition-all duration-200 shadow-md flex flex-col justify-between",
             div {
@@ -61,7 +58,9 @@ fn ServerCard(server: ServerInfo) -> Element {
             div { class: "mt-4 flex items-center justify-between text-xs text-neutral-500",
                 span { class: "font-mono", "ID: {server.id}" }
 
-                button { class: "px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm transition-colors",
+                Link {
+                    to: "/console/{server.id}",
+                    class: "px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm transition-colors inline-block align-middle",
                     "open console"
                 }
             }
